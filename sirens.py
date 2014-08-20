@@ -64,8 +64,8 @@ class HttpHelper:
 			return content
 
 class AlertHandler:
-	def __init__(self, file_path, print_to_screen, git_commit_and_push = False):
-		self.__file_path__ = file_path
+	def __init__(self, file_paths, print_to_screen, git_commit_and_push = False):
+		self.__file_paths__ = file_paths
 		self.__print_to_screen__ = print_to_screen
 		self.__git_commit_and_push__ = git_commit_and_push
 
@@ -79,25 +79,30 @@ class AlertHandler:
 		cur_time = time.strftime('%d/%m/%Y %H:%M:%S', time.localtime())
 		formatted_msg = "%s - %s" % (cur_time, message)
 		if self.__print_to_screen__: print formatted_msg
-		if self.__file_path__ != None:
-			with codecs.open(self.__file_path__, 'a', 'utf8') as f:
-				f.write(formatted_msg)
-			if self.__git_commit_and_push__:
-				file_dir = os.path.split(self.__file_path__)
-				commit_cmd = 'git commit -m "Updated siren file" %s' % os.path.join(self.__file_path__)
-				if (0 != os.system("%s" % commit_cmd)): raise Exception("Failed to commit")
-				push_cmd = 'git push'
-				if (0 != os.system("%s" % push_cmd)): raise Exception("Failed to push")
+		if len(self.__file_paths__) > 0:
+			for file_path in self.__file_paths__:
+				with codecs.open(file_path, 'a', 'utf8') as f:
+					f.write(formatted_msg)
+				if self.__git_commit_and_push__:
+					file_dir = os.path.split(file_path)[0]
+					#check if there's a git repository in the file's folder, if not, skip this step
+					if not os.path.exists(os.path.join(file_dir, '.git')): continue
+					#commit
+					commit_cmd = 'git commit -m "Updated siren file" %s' % os.path.join(file_path)
+					if (0 != os.system("%s" % commit_cmd)): raise Exception("Failed to commit")
+					#push
+					push_cmd = 'git push'
+					if (0 != os.system("%s" % push_cmd)): raise Exception("Failed to push")
 
 def main(argv):
-	if len(argv) not in (1, 2):
+	if len(argv) == 2 and argv[1].lower() == '-h':
 		print 'Usage: %s [output_file]' % os.path.split(argv[0])[1]
 		return -1
 
-	file_path = None
-	if len(argv) == 2: file_path = argv[1]
+	file_paths = []
+	if len(argv) >= 2: file_paths = argv[1:]
 
-	handler = AlertHandler(file_path, False, True)
+	handler = AlertHandler(file_paths, False, True)
 	alerter = Alerter(JsonUrl)
 	
 	alerter.start(handler)
